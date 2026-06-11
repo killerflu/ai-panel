@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚡ AI Panel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #060606;
+      --claude: #D97706;
+      --gemini: #3B82F6;
+      --groq: #10B981;
+    }
+
+    body {
+      background: var(--bg);
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    /* Header */
+    header {
+      padding: 28px 24px 20px;
+      border-bottom: 1px solid #0f0f0f;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header h1 { font-size: 22px; font-weight: 900; letter-spacing: 0.12em; }
+    header p  { color: #333; font-size: 11px; margin-top: 4px; letter-spacing: 0.2em; }
+
+    .status-dots { display: flex; gap: 12px; align-items: center; }
+    .dot-item    { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #333; }
+    .dot         { width: 7px; height: 7px; border-radius: 50%; background: #222; transition: all 0.3s; }
+    .dot.active  { background: var(--color); box-shadow: 0 0 8px var(--color); }
+
+    /* Input */
+    .input-wrap {
+      max-width: 1200px; margin: 20px auto 0; padding: 0 20px;
+    }
+    .input-box {
+      display: flex; gap: 10px; align-items: flex-end;
+      background: #0c0c0c; border: 1px solid #1e1e1e;
+      border-radius: 10px; padding: 12px 14px;
+    }
+    textarea {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: #ddd; font-size: 14px; resize: none;
+      font-family: monospace; line-height: 1.6;
+    }
+    #sendBtn {
+      align-self: flex-end; padding: 9px 20px;
+      background: #fff; color: #000; border: none; border-radius: 7px;
+      font-weight: 700; font-size: 13px; cursor: pointer;
+      font-family: monospace; transition: all 0.2s; white-space: nowrap;
+    }
+    #sendBtn:disabled { background: #111; color: #333; cursor: not-allowed; }
+
+    /* Server URL notice */
+    .server-bar {
+      max-width: 1200px; margin: 10px auto 0; padding: 0 20px;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .server-bar input {
+      flex: 1; padding: 7px 12px; background: #0c0c0c;
+      border: 1px solid #1e1e1e; border-radius: 6px;
+      color: #666; font-size: 12px; font-family: monospace; outline: none;
+    }
+    .server-bar label { color: #333; font-size: 11px; white-space: nowrap; }
+
+    /* Panels */
+    .panels {
+      max-width: 1200px; margin: 16px auto 0; padding: 0 20px;
+      display: flex; gap: 14px; flex-wrap: wrap;
+    }
+    .panel {
+      flex: 1; min-width: 260px; border-radius: 12px; overflow: hidden;
+      border: 1px solid #1a1a1a; display: flex; flex-direction: column;
+      transition: all 0.3s;
+    }
+    .panel.loading { animation: glow 1.5s ease-in-out infinite alternate; }
+    @keyframes glow {
+      from { box-shadow: 0 0 4px var(--color); }
+      to   { box-shadow: 0 0 18px var(--color); }
+    }
+
+    .panel-header {
+      padding: 13px 16px; border-bottom: 1px solid #111;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .panel-icon  { font-size: 20px; }
+    .panel-name  { font-weight: 700; font-size: 14px; }
+    .panel-sub   { font-size: 11px; color: #333; }
+    .panel-status { margin-left: auto; }
+
+    .panel-body {
+      padding: 14px 16px; overflow-y: auto;
+      font-size: 13.5px; line-height: 1.75; color: #c8c8c8;
+      min-height: 180px; max-height: 300px;
+      white-space: pre-wrap;
+    }
+    .panel-body .placeholder { color: #222; text-align: center; margin-top: 50px; font-size: 13px; }
+    .panel-body .err { color: #EF4444; font-size: 12px; }
+
+    .panel-footer {
+      padding: 10px 14px; border-top: 1px solid #111;
+      display: flex; gap: 8px;
+    }
+    .debate-btn {
+      flex: 1; padding: 7px 0; border-radius: 6px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      font-family: monospace; transition: opacity 0.2s;
+    }
+    .debate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Thinking dots */
+    .dots { display: flex; gap: 4px; }
+    .dots span {
+      width: 5px; height: 5px; border-radius: 50%;
+      animation: blink 1.2s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%,100% { opacity: 0.15; transform: scale(0.8); }
+      50%      { opacity: 1;    transform: scale(1.2); }
+    }
+
+    /* Debate results */
+    .debates { max-width: 1200px; margin: 14px auto 0; padding: 0 20px; }
+    .debate-card {
+      border-radius: 10px; padding: 14px 16px; margin-bottom: 10px;
+      font-size: 13px; line-height: 1.75; color: #bbb;
+    }
+    .debate-card-title { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+
+    /* Summary */
+    .summary-wrap { max-width: 1200px; margin: 18px auto 0; padding: 0 20px; text-align: center; }
+    #summaryBtn {
+      padding: 11px 28px; background: #0d0d0d;
+      border: 1px solid #2a2a2a; border-radius: 8px; color: #888;
+      font-size: 13px; cursor: pointer; font-family: monospace;
+    }
+    #summaryBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .summary-result {
+      max-width: 1200px; margin: 14px auto 0; padding: 0 20px;
+    }
+    .summary-box {
+      background: #0a0a12; border: 1px solid #2a2a4a;
+      border-radius: 12px; padding: 20px 22px;
+      font-size: 14px; line-height: 1.8; color: #d0d0e0;
+      white-space: pre-wrap; text-align: left;
+    }
+    .summary-title {
+      color: #818CF8; font-size: 12px; font-weight: 700;
+      letter-spacing: 0.15em; margin-bottom: 12px;
+    }
+
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>⚡ AI PANEL</h1>
+    <p>3-WAY DEBATE SYSTEM</p>
+  </div>
+  <div class="status-dots" id="statusDots"></div>
+</header>
+
+<!-- Server URL -->
+<div class="server-bar">
+  <label>서버 URL:</label>
+  <input type="text" id="serverUrl" placeholder="https://your-project.vercel.app" />
+</div>
+
+<!-- Input -->
+<div class="input-wrap">
+  <div class="input-box">
+    <textarea id="questionInput" rows="2" placeholder="질문 입력... (Enter 전송 / Shift+Enter 줄바꿈)"></textarea>
+    <button id="sendBtn" disabled>전송 →</button>
+  </div>
+</div>
+
+<!-- Panels -->
+<div class="panels" id="panels"></div>
+
+<!-- Debate results -->
+<div class="debates" id="debates"></div>
+
+<!-- Summary -->
+<div class="summary-wrap" id="summaryWrap" style="display:none">
+  <button id="summaryBtn">✦ 종합 분석 & 최적 결론 도출</button>
+</div>
+<div class="summary-result" id="summaryResult"></div>
+
+<script>
+const AIS = {
+  claude: { name: "Claude",   subtitle: "Anthropic",       color: "#D97706", bg: "#0f0a02", icon: "◈" },
+  gemini: { name: "Gemini",   subtitle: "Google",          color: "#3B82F6", bg: "#020810", icon: "◇" },
+  groq:   { name: "LLaMA 3",  subtitle: "Groq · 무료",     color: "#10B981", bg: "#020f08", icon: "◉" },
+};
+
+let responses = { claude: "", gemini: "", groq: "" };
+let history   = [];
+let busy      = false;
+
+// ── Init panels ─────────────────────────────────────────
+const panelsEl = document.getElementById("panels");
+const dotsEl   = document.getElementById("statusDots");
+
+Object.entries(AIS).forEach(([key, ai]) => {
+  // dot
+  dotsEl.innerHTML += `
+    <div class="dot-item">
+      <div class="dot" id="dot-${key}" style="--color:${ai.color}"></div>
+      <span>${ai.name}</span>
+    </div>`;
+
+  // panel
+  panelsEl.innerHTML += `
+    <div class="panel" id="panel-${key}" style="--color:${ai.color}; background:${ai.bg}; border-color:#1a1a1a">
+      <div class="panel-header">
+        <span class="panel-icon" style="color:${ai.color}">${ai.icon}</span>
+        <div>
+          <div class="panel-name" style="color:${ai.color}">${ai.name}</div>
+          <div class="panel-sub">${ai.subtitle}</div>
+        </div>
+        <div class="panel-status" id="status-${key}"></div>
+      </div>
+      <div class="panel-body" id="body-${key}">
+        <div class="placeholder">답변 대기 중</div>
+      </div>
+      <div class="panel-footer" id="footer-${key}" style="display:none">
+        <button class="debate-btn"
+          style="background:#0a1a0e;border:1px solid #10B98133;color:#10B981"
+          onclick="debate('${key}','agree')">👍 동의</button>
+        <button class="debate-btn"
+          style="background:#1a0808;border:1px solid #EF444433;color:#EF4444"
+          onclick="debate('${key}','disagree')">👎 반박</button>
+      </div>
+    </div>`;
+});
+
+// ── Server URL & Send btn ────────────────────────────────
+const serverInput = document.getElementById("serverUrl");
+const sendBtn     = document.getElementById("sendBtn");
+const qInput      = document.getElementById("questionInput");
+
+// Load saved URL
+serverInput.value = localStorage.getItem("serverUrl") || "";
+serverInput.addEventListener("change", () => {
+  localStorage.setItem("serverUrl", serverInput.value.trim());
+  updateSendBtn();
+});
+qInput.addEventListener("input", updateSendBtn);
+qInput.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+function updateSendBtn() {
+  sendBtn.disabled = busy || !qInput.value.trim() || !serverInput.value.trim();
+}
+sendBtn.addEventListener("click", send);
+
+// ── Send ─────────────────────────────────────────────────
+async function send() {
+  const q      = qInput.value.trim();
+  const server = serverInput.value.trim().replace(/\/$/, "");
+  if (!q || !server || busy) return;
+
+  qInput.value = "";
+  busy = true;
+  updateSendBtn();
+  responses = { claude: "", gemini: "", groq: "" };
+  document.getElementById("debates").innerHTML = "";
+  document.getElementById("summaryWrap").style.display = "none";
+  document.getElementById("summaryResult").innerHTML = "";
+
+  Object.keys(AIS).forEach(key => {
+    setLoading(key, true);
+    document.getElementById("body-" + key).innerHTML = '<div class="placeholder">생각 중...</div>';
+    document.getElementById("footer-" + key).style.display = "none";
+  });
+
+  try {
+    const res  = await fetch(`${server}/api/chat`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ question: q, history }),
+    });
+    const data = await res.json();
+
+    Object.entries(data).forEach(([key, val]) => {
+      setLoading(key, false);
+      if (typeof val === "string") {
+        responses[key] = val;
+        document.getElementById("body-" + key).textContent = val;
+        document.getElementById("footer-" + key).style.display = "flex";
+      } else {
+        document.getElementById("body-" + key).innerHTML =
+          `<div class="err">⚠ ${val.error || "오류"}</div>`;
+      }
+    });
+
+    history = [...history,
+      { role: "user", content: q },
+      { role: "assistant", content:
+        `Claude: ${responses.claude}\nGemini: ${responses.gemini}\nLLaMA: ${responses.groq}` },
+    ];
+
+    if (Object.values(responses).some(Boolean))
+      document.getElementById("summaryWrap").style.display = "block";
+
+  } catch (e) {
+    Object.keys(AIS).forEach(key => {
+      setLoading(key, false);
+      document.getElementById("body-" + key).innerHTML =
+        `<div class="err">⚠ 서버 연결 실패: ${e.message}</div>`;
+    });
+  }
+
+  busy = false;
+  updateSendBtn();
+}
+
+// ── Debate ───────────────────────────────────────────────
+async function debate(aiKey, type) {
+  const server = serverInput.value.trim().replace(/\/$/, "");
+  if (!server) return;
+
+  document.querySelectorAll(".debate-btn").forEach(b => b.disabled = true);
+
+  try {
+    const res  = await fetch(`${server}/api/debate`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ aiKey, type, myResponse: responses[aiKey], otherResponses: responses }),
+    });
+    const data = await res.json();
+    const ai   = AIS[aiKey];
+    const card = document.createElement("div");
+    card.className = "debate-card";
+    card.style.cssText = `background:${ai.bg};border:1px solid ${ai.color}44`;
+    card.innerHTML = `
+      <div class="debate-card-title" style="color:${ai.color}">
+        ${ai.icon} ${ai.name} — ${type === "agree" ? "👍 동의 의견" : "👎 반박 의견"}
+      </div>
+      ${data.answer || data.error}`;
+    document.getElementById("debates").appendChild(card);
+  } catch (e) {
+    alert("토론 요청 실패: " + e.message);
+  }
+
+  document.querySelectorAll(".debate-btn").forEach(b => b.disabled = false);
+}
+
+// ── Summary ──────────────────────────────────────────────
+document.getElementById("summaryBtn").addEventListener("click", async () => {
+  const server = serverInput.value.trim().replace(/\/$/, "");
+  if (!server) return;
+  const btn = document.getElementById("summaryBtn");
+  btn.disabled = true;
+  btn.textContent = "⏳ 분석 중...";
+
+  try {
+    const res  = await fetch(`${server}/api/summary`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ responses }),
+    });
+    const data = await res.json();
+    document.getElementById("summaryWrap").style.display = "none";
+    document.getElementById("summaryResult").innerHTML = `
+      <div class="summary-box">
+        <div class="summary-title">✦ 종합 분석 결과</div>
+        ${data.summary || data.error}
+      </div>`;
+  } catch (e) {
+    alert("요약 실패: " + e.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = "✦ 종합 분석 & 최적 결론 도출";
+});
+
+// ── Helpers ──────────────────────────────────────────────
+function setLoading(key, on) {
+  const dot   = document.getElementById("dot-" + key);
+  const panel = document.getElementById("panel-" + key);
+  const stat  = document.getElementById("status-" + key);
+  const ai    = AIS[key];
+
+  dot.classList.toggle("active", on);
+  panel.classList.toggle("loading", on);
+  panel.style.borderColor = on ? ai.color : responses[key] ? ai.color + "88" : "#1a1a1a";
+
+  stat.innerHTML = on
+    ? `<div class="dots">
+         <span style="background:${ai.color};animation-delay:0s"></span>
+         <span style="background:${ai.color};animation-delay:0.2s"></span>
+         <span style="background:${ai.color};animation-delay:0.4s"></span>
+       </div>`
+    : responses[key]
+      ? `<div style="width:7px;height:7px;border-radius:50%;background:${ai.color};opacity:0.7"></div>`
+      : "";
+}
+
+updateSendBtn();
+</script>
+</body>
+</html>

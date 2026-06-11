@@ -1,0 +1,8 @@
+{
+  "name": "ai-panel",
+  "version": "1.0.0",
+  "description": "3-way AI panel debate system",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
